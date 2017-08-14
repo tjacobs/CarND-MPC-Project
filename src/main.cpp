@@ -44,8 +44,7 @@ double polyeval(Eigen::VectorXd coeffs, double x) {
 // Fit a polynomial.
 // Adapted from
 // https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
-Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
-                        int order) {
+Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals, int order) {
   assert(xvals.size() == yvals.size());
   assert(order >= 1 && order <= xvals.size() - 1);
   Eigen::MatrixXd A(xvals.size(), order + 1);
@@ -85,16 +84,42 @@ int main() {
         string event = j[0].get<string>();
         if (event == "telemetry") {
           // j[1] is the data JSON object
-          vector<double> ptsx = j[1]["ptsx"];
-          vector<double> ptsy = j[1]["ptsy"];
+//          Eigen::VectorXd ptsx = j[1]["ptsx"];
+//          Eigen::VectorXd ptsy = j[1]["ptsy"];
           double px = j[1]["x"];
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
+          Eigen::VectorXd ptsx(2);
+          Eigen::VectorXd ptsy(2);
+          ptsx << -100, 100;
+          ptsy << -1, -1;
+
           // Create state
-          Eigen::VectorXd state;
+          Eigen::VectorXd state(6);
           Eigen::VectorXd coefficients;
+
+          // Fit a polynomial to the above x and y coordinates
+          auto coeffs = polyfit(ptsx, ptsy, 1);
+
+          // The cross track error is calculated by evaluating at polynomial at x, f(x) and subtracting y.
+          double cte = polyeval(coeffs, px) - py;
+
+          // Due to the sign starting at 0, the orientation error is -f'(x).
+          double epsi = psi - atan(coeffs[1]);
+
+          // Set state
+          state << px, py, psi, v, cte, epsi;
+
+          std::vector<double> x_vals = {state[0]};
+          std::vector<double> y_vals = {state[1]};
+          std::vector<double> psi_vals = {state[2]};
+          std::vector<double> v_vals = {state[3]};
+          std::vector<double> cte_vals = {state[4]};
+          std::vector<double> epsi_vals = {state[5]};
+          std::vector<double> delta_vals = {};
+          std::vector<double> a_vals = {};
 
           /*
           * Calculate steering angle and throttle using MPC.
