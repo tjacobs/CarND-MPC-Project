@@ -6,7 +6,7 @@
 using CppAD::AD;
 
 // Set the timestep length and duration
-size_t N = 20;
+size_t N = 10;
 double dt = 0.1;
 
 // This value assumes the model presented in the classroom is used.
@@ -107,8 +107,8 @@ class FG_eval {
       // Only consider the actuation at time t.
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
-      AD<double> f0 = coeffs[0] + coeffs[1] * x0;
-      AD<double> psides0 = CppAD::atan(coeffs[1]);
+      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * CppAD::pow(x0, 2) + coeffs[3] * CppAD::pow(x0, 3);
+      AD<double> psides0 = CppAD::atan(coeffs[1] + 2 * coeffs[2] * x0 + 3 * coeffs[3] * CppAD::pow(x0, 2));
 
       // The equations for the model:
       // x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
@@ -119,10 +119,10 @@ class FG_eval {
       // epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
       fg[1 + x_start    + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
       fg[1 + y_start    + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-      fg[1 + psi_start  + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
+      fg[1 + psi_start  + t] = psi1 - (psi0 - v0 * delta0 / Lf * dt);
       fg[1 + v_start    + t] = v1 - (v0 + a0 * dt);
       fg[1 + cte_start  + t] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
-      fg[1 + epsi_start + t] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * dt);
+      fg[1 + epsi_start + t] = epsi1 - ((psi0 - psides0) - v0 * delta0 / Lf * dt);
     }
   }
 };
@@ -160,14 +160,14 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // Hey solver, steering can go from left 25 degrees to right 25 degrees
   for (int i = delta_start; i < a_start; i++) {
-      vars_lowerbound[i] = -0.436332; // -25 in rads
-      vars_upperbound[i] = 0.436332; // 25 in rads
+    vars_lowerbound[i] = -0.436332; // -25 in rads
+    vars_upperbound[i] = 0.436332; // 25 in rads
   }
 
   // Hey solver, acceleration is ok to go from full backwards to full forwards
   for (int i = a_start; i < n_vars; i++) {
-      vars_lowerbound[i] = -1.0;
-      vars_upperbound[i] = 1.0;
+    vars_lowerbound[i] = -1.0;
+    vars_upperbound[i] = 1.0;
   }
 
   // Load state
@@ -240,6 +240,15 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   auto cost = solution.obj_value;
   std::cout << "Cost " << cost << std::endl;
 
-  // Return just the solved next timestep actuator values.
-  return {solution.x[delta_start],   solution.x[a_start]};
+  // Return actuation
+  vector<double> result;
+  result.push_back(solution.x[delta_start]);
+  result.push_back(solution.x[a_start]);
+
+  // Return x, y co-ords of solution for display
+  for (int i = 0; i < N-1; i++) {
+    result.push_back(solution.x[x_start + i + 1]);
+    result.push_back(solution.x[y_start + i + 1]);
+  }
+  return result;
 }
