@@ -19,7 +19,28 @@ So to get started, I first transform the waypoints given by the simulator into v
 
 I then pass these into the solver. The solver tries to minimise the cost function over N timesteps, each of 100ms.
 
-For N, the number of timesteps calculated, I at first tried 20, but my computer couldn't solve it fast enough and the simulated car often ran off the road. I also tried five, and it drove smoothly but with a large crosstrack error, with the car always on the rigth side of the road. So I settled with 10, which plots far enough out to drive smoothly and keeps the car in the centre of the road.
+The model predicts the car's movement using the equations:
+
+```
+      x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
+      y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
+      psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
+      v_[t+1] = v[t] + a[t] * dt
+      cte[t+1] = f(x[t]) - y[t] + v[t] * sin(epsi[t]) * dt
+      epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
+```
+We translate that into something the solver can use by forcing the constraints to be zero, and rearranging the equations so that they are true when forced to zero:
+
+```
+      fg[1 + x_start    + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
+      fg[1 + y_start    + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
+      fg[1 + psi_start  + t] = psi1 - (psi0 - v0 * delta0 / Lf * dt);
+      fg[1 + v_start    + t] = v1 - (v0 + a0 * dt);
+      fg[1 + cte_start  + t] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
+      fg[1 + epsi_start + t] = epsi1 - ((psi0 - psides0) - v0 * delta0 / Lf * dt);
+```
+
+For N, the number of timesteps calculated, I at first tried 20, but my computer couldn't solve it fast enough and the simulated car often ran off the road. I also tried five, and it drove smoothly but with a large crosstrack error, with the car always on the rigth side of the road. So I settled with 10, which plots far enough out to drive smoothly and keeps the car in the centre of the road. I used dt = 0.1 (100ms), and didn't vary it from this - it seemed a suitable distance out based on 10 timesteps, about a car-lengths out ahead of the car.
 
 For the cost function, I defined a number of coefficients to control what elements were taken into account and by how much in relation to each other. They are:
 
@@ -52,4 +73,8 @@ For the cost function, I defined a number of coefficients to control what elemen
 This resulted in a pretty smooth ride:
 
 ![](v1.gif)
+
+But the 100ms delay was giving it trouble, as seen by when the car swerves and oscilates back and forth around the centre of the track.
+
+So to handle the 100ms delay, I 
 
