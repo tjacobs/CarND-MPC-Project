@@ -8,8 +8,10 @@ using CppAD::AD;
 #define COST_CROSSTRACK_ERROR 100 // How bad is it to be away from the centre of the road? Pretty bad.
 #define COST_ANGLE_ERROR      10  // How bad is it to be angled differently than the ideal path? Not as bad.
 #define COST_SPEED_ERROR      5   // How bad is it to be going slower than we want? Okay.
-#define COST_MOVEMENT_ERROR   10  // How bad is it to be speed up or turn left or right quickly? Bad.
-#define COST_JERK_ERROR       20  // How bad is it to be speed up, slow down, turn left and right jittery? Real bad.
+#define COST_MOVEMENT_ERROR   10  // How bad is it to speed up or turn left or right quickly? Bad.
+#define COST_JERK_ERROR       20  // How bad is it to speed up, slow down, turn left and right jittery? Real bad.
+#define COST_SPEED_CORNERING  50  // How bad is it to have velocity while taking a corner? Just don't do it!
+
 
 // Set the timestep length and duration
 size_t N = 10;
@@ -28,7 +30,7 @@ double dt = 0.1;
 const double Lf = 2.67;
 
 // How fast should we aim to go?
-double ref_v = 40;
+double ref_v = 50;
 
 // The solver takes all the state variables and actuator variables in a singular vector.
 // We should to establish when one variable starts and another ends to make our life easier.
@@ -70,9 +72,11 @@ class FG_eval {
     // Add cost for:
     // + Changing delta steering angle
     // + Increasing or decreasing acceleration
+    // + Having speed while cornering
     for (int t = 0; t < N - 1; t++) {
       fg[0] += COST_MOVEMENT_ERROR * CppAD::pow(vars[delta_start + t], 2);
       fg[0] += COST_MOVEMENT_ERROR * CppAD::pow(vars[a_start + t], 2);
+      fg[0] += COST_SPEED_CORNERING * CppAD::pow(vars[delta_start + t] * vars[v_start + t], 2);
     }
 
     // Minimize the value gap between sequential actuations.
