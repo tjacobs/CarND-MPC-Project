@@ -3,7 +3,7 @@
 --
 
 
-![](v1.gif)
+![](v1.png)
 
 For the cost function, I defined a number of coefficients to control what elements were taken into account and by how much in relation to each other. They are:
 
@@ -35,3 +35,4 @@ For the cost function, I defined a number of coefficients to control what elemen
 
 For N, the number of timesteps calculated each frame, I first tried 20, but it couldn't solve it fast enough and ran off the road. I also tried 5, and it drove smoothly but with a large crosstrack error, at the side of the road. So I settled with 10, which plots far enough out to drive smoothly and in the centre of the road.
 
+![](v1.gif)
