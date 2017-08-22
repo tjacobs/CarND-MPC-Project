@@ -2,8 +2,24 @@
 
 --
 
-
 ![](v1.png)
+
+A public version of this writeup is also [available here](https://medium.com/australian-robotics-society/self-driving-cars-calculating-actuation-f6b874c2ec70).
+
+In this project, we’re presented with a simulated car in a simulated world, with waypoints (a series of <x, y> co-ordinates in the world) of a planned path ahead of it. The car’s task is to calculate what the steering wheel and acceleration and brake pedal commands should be to send to the car for it to follow the planned path smoothly and safely.
+
+If you think about how humans drive, we don’t just look at the scene in front and base our steering and speed adjustment movements on that one single frame. We’re always planning ahead a few seconds with paths of where we can go, and taking into account how we’ll likely spin the wheel in a few seconds in order to make that right or left turn the best way possible.
+
+That’s what Model Predictive Control does. It models out the car’s predicted movement based on a simple model, which basically says “if I’m pointing this way, with this speed, and this steering wheel angle, after a second, I believe I’ll be here in the world.”
+We do this at every time step (i.e. every 100ms), and we plot out what our path will be over the next few seconds, given the current state of the car and the world.
+
+We then actuate, that is, follow our calculated plan, adjusting our steering wheel and speed based on the very first time step’s commands (i.e. what we should be doing right now). But — we don’t just blindly follow our entire series of many computed actuations the entire way trough the few seconds that we calculated ahead of us in time; just as a human doesn’t plan out a path and then carry it out with closed eyes for few seconds. Things change. So while we need to compute the path a few seconds ahead in order to execute complex, optimal, and smooth moves, we only actually ever use the very first computed steering and speed commands.
+
+So to get started, I first transform the waypoints given by the simulator into vehicle relative waypoints. 
+
+I then pass these into the solver. The solver tries to minimise the cost function over N timesteps, each of 100ms.
+
+For N, the number of timesteps calculated, I at first tried 20, but my computer couldn't solve it fast enough and the simulated car often ran off the road. I also tried five, and it drove smoothly but with a large crosstrack error, with the car always on the rigth side of the road. So I settled with 10, which plots far enough out to drive smoothly and keeps the car in the centre of the road.
 
 For the cost function, I defined a number of coefficients to control what elements were taken into account and by how much in relation to each other. They are:
 
@@ -33,6 +49,7 @@ For the cost function, I defined a number of coefficients to control what elemen
 #define COST_SPEED_CORNERING  50  
 ```
 
-For N, the number of timesteps calculated each frame, I first tried 20, but it couldn't solve it fast enough and ran off the road. I also tried 5, and it drove smoothly but with a large crosstrack error, at the side of the road. So I settled with 10, which plots far enough out to drive smoothly and in the centre of the road.
+This resulted in a pretty smooth ride:
 
 ![](v1.gif)
+
