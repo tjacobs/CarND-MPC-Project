@@ -110,7 +110,7 @@ int main() {
           // Fit a polynomial to the above x and y coordinates
           auto coeffs = polyfit(ptsx_transformed_eigen, ptsy_transformed_eigen, 3);
 
-          // The cross track error is calculated by evaluating at polynomial at x (0), f(x) and subtracting y (0).
+          // The cross track error is calculated by evaluating a polynomial at x (0), f(x) and subtracting y (0).
           double cte = polyeval(coeffs, 0);
 
           // Due to the sign starting at 0, the orientation error is -f'(x).
@@ -123,7 +123,6 @@ int main() {
           // Calculate steering angle and throttle using MPC.
           // Both are in between [-1, 1].
           auto actuation = mpc.Solve(state, coeffs);
-          actuation = { -0.005, 0.5 };
 
           // Don't make me use the CLAMPS!
           // Divide by deg2rad(25) before you send the steering value back.
@@ -143,9 +142,9 @@ int main() {
           // The points in the simulator are shown by a green line.
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
-          for (int i = 2; i < state.size(); i += 2) {
-              mpc_x_vals.push_back(state[i]);
-              mpc_y_vals.push_back(state[i+1]);
+          for (int i = 2; i < actuation.size(); i += 2) {
+            mpc_x_vals.push_back(actuation[i]);
+            mpc_y_vals.push_back(actuation[i+1]);
           }
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
@@ -173,7 +172,7 @@ int main() {
           // around the track with 100ms latency.
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+          //this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
