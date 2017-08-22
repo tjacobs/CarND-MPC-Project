@@ -5,6 +5,12 @@
 
 using CppAD::AD;
 
+#define COST_CROSSTRACK_ERROR 100 // How bad is it to be away from the centre of the road? Pretty bad.
+#define COST_ANGLE_ERROR      10  // How bad is it to be angled differently than the ideal path? Not as bad.
+#define COST_SPEED_ERROR      5   // How bad is it to be going slower than we want? Okay.
+#define COST_MOVEMENT_ERROR   10  // How bad is it to be speed up or turn left or right quickly? Bad.
+#define COST_JERK_ERROR       20  // How bad is it to be speed up, slow down, turn left and right jittery? Real bad.
+
 // Set the timestep length and duration
 size_t N = 10;
 double dt = 0.1;
@@ -55,9 +61,9 @@ class FG_eval {
     // + Error psi angle ^2
     // + Velocity below target speed ^2
     for (int t = 0; t < N; t++) {
-      fg[0] += CppAD::pow(vars[cte_start + t], 2);
-      fg[0] += CppAD::pow(vars[epsi_start + t], 2);
-      fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
+      fg[0] += COST_CROSSTRACK_ERROR * CppAD::pow(vars[cte_start + t], 2);
+      fg[0] += COST_ANGLE_ERROR * CppAD::pow(vars[epsi_start + t], 2);
+      fg[0] += COST_SPEED_ERROR * CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
 
     // Minimize the use of actuators.
@@ -65,15 +71,15 @@ class FG_eval {
     // + Changing delta steering angle
     // + Increasing or decreasing acceleration
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t], 2);
+      fg[0] += COST_MOVEMENT_ERROR * CppAD::pow(vars[delta_start + t], 2);
+      fg[0] += COST_MOVEMENT_ERROR * CppAD::pow(vars[a_start + t], 2);
     }
 
     // Minimize the value gap between sequential actuations.
     // The next action should look like the current action!
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+      fg[0] += COST_JERK_ERROR * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += COST_JERK_ERROR * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
 
     // Initial constraints
