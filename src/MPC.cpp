@@ -114,9 +114,16 @@ class FG_eval {
       AD<double> cte0 = vars[cte_start + t - 1];
       AD<double> epsi0 = vars[epsi_start + t - 1];
 
+      // Look back two timsteps if we can, to account for 100ms one timestep command latency
+      int back = 1;
+      if ( t > 1 ) {
+        back = 2;
+      }
+
       // Only consider the actuation at time t.
-      AD<double> delta0 = vars[delta_start + t - 1];
-      AD<double> a0 = vars[a_start + t - 1];
+      AD<double> delta0 = vars[delta_start + t - back];
+      AD<double> a0 = vars[a_start + t - back];
+
       AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * CppAD::pow(x0, 2) + coeffs[3] * CppAD::pow(x0, 3);
       AD<double> psides0 = CppAD::atan(coeffs[1] + 2 * coeffs[2] * x0 + 3 * coeffs[3] * CppAD::pow(x0, 2));
 
