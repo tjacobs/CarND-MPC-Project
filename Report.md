@@ -6,18 +6,19 @@
 
 A public version of this writeup is also [available here](https://medium.com/australian-robotics-society/self-driving-cars-calculating-actuation-f6b874c2ec70).
 
-In this project, we’re presented with a simulated car in a simulated world, with waypoints (a series of <x, y> co-ordinates in the world) of a planned path ahead of it. The car’s task is to calculate what the steering wheel and acceleration and brake pedal commands should be to send to the car for it to follow the planned path smoothly and safely.
+In this project, we’re presented with a simulated car in a simulated world, with waypoints (a series of x, y coordinates in the world) of a planned path ahead of it. The car’s task is to calculate what the steering wheel and acceleration and brake pedal commands should be to sent to the car for it to follow the planned path smoothly and safely around the track.
 
-If you think about how humans drive, we don’t just look at the scene in front and base our steering and speed adjustment movements on that one single frame. We’re always planning ahead a few seconds with paths of where we can go, and taking into account how we’ll likely spin the wheel in a few seconds in order to make that right or left turn the best way possible.
+If you think about how humans drive, we don’t just look at the scene in front and base our steering and speed adjustment movements on that one single frame. We’re always planning ahead a few seconds with paths of where we can go, and taking into account how we’ll likely spin the wheel in a few seconds from now in order to make that right or left turn the best way possible.
 
-That’s what Model Predictive Control does. It models out the car’s predicted movement based on a simple model, which basically says “if I’m pointing this way, with this speed, and this steering wheel angle, after a second, I believe I’ll be here in the world.”
+That’s what Model Predictive Control does. It models out the car’s predicted movement based on a simple model, which basically says “if I’m pointing this way, with this speed, and this steering angle, after a second, I believe I’ll be here in the world.”
+
 We do this at every time step (i.e. every 100ms), and we plot out what our path will be over the next few seconds, given the current state of the car and the world.
 
-We then actuate, that is, follow our calculated plan, adjusting our steering wheel and speed based on the very first time step’s commands (i.e. what we should be doing right now). But — we don’t just blindly follow our entire series of many computed actuations the entire way trough the few seconds that we calculated ahead of us in time; just as a human doesn’t plan out a path and then carry it out with closed eyes for few seconds. Things change. So while we need to compute the path a few seconds ahead in order to execute complex, optimal, and smooth moves, we only actually ever use the very first computed steering and speed commands.
+We then actuate, that is, follow our calculated plan, adjusting our steering wheel and speed based on the very first time step’s commands (i.e. what we should be doing right now). But — we don’t just blindly follow our entire series of many computed actuations the entire way through the few seconds that we calculated ahead of us in time; just as a human doesn’t plan out a path and then carry it out with closed eyes for few seconds. Things change. So while we need to compute the path a few seconds ahead in order to execute complex, optimal, and smooth moves, we only actually ever use the very first computed steering and speed commands.
 
-So to get started, I first transform the waypoints given by the simulator into vehicle relative waypoints. 
+So to get started, I first transform the waypoints given by the simulator into vehicle relative waypoints. I then pass these into the solver. The solver tries to minimise the cost function over N timesteps, each of 100ms.
 
-I then pass these into the solver. The solver tries to minimise the cost function over N timesteps, each of 100ms.
+For N, the number of timesteps calculated, I at first tried 20, but my computer couldn't solve it fast enough and the simulated car often ran off the road. I also tried five, and it drove smoothly but with a large crosstrack error, with the car always on the rigth side of the road. So I settled with 10, which plots far enough out to drive smoothly and keeps the car in the centre of the road. I used dt = 0.1 (100ms), and didn't vary it from this - it seemed a suitable distance out based on 10 timesteps, about a car-lengths out ahead of the car.
 
 The model predicts the car's movement using the equations:
 
@@ -32,15 +33,13 @@ The model predicts the car's movement using the equations:
 We translate that into something the solver can use by forcing the constraints to be zero, and rearranging the equations so that they are true when forced to zero:
 
 ```
-      fg[1 + x_start    + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
-      fg[1 + y_start    + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-      fg[1 + psi_start  + t] = psi1 - (psi0 - v0 * delta0 / Lf * dt);
-      fg[1 + v_start    + t] = v1 - (v0 + a0 * dt);
-      fg[1 + cte_start  + t] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
-      fg[1 + epsi_start + t] = epsi1 - ((psi0 - psides0) - v0 * delta0 / Lf * dt);
+      0 = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
+      0 = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
+      0 = psi1 - (psi0 - v0 * delta0 / Lf * dt);
+      0 = v1 - (v0 + a0 * dt);
+      0 = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
+      0 = epsi1 - ((psi0 - psides0) - v0 * delta0 / Lf * dt);
 ```
-
-For N, the number of timesteps calculated, I at first tried 20, but my computer couldn't solve it fast enough and the simulated car often ran off the road. I also tried five, and it drove smoothly but with a large crosstrack error, with the car always on the rigth side of the road. So I settled with 10, which plots far enough out to drive smoothly and keeps the car in the centre of the road. I used dt = 0.1 (100ms), and didn't vary it from this - it seemed a suitable distance out based on 10 timesteps, about a car-lengths out ahead of the car.
 
 For the cost function, I defined a number of coefficients to control what elements were taken into account and by how much in relation to each other. They are:
 
@@ -70,11 +69,11 @@ For the cost function, I defined a number of coefficients to control what elemen
 #define COST_SPEED_CORNERING  50  
 ```
 
-This resulted in a pretty smooth ride:
+After a bit of tuning and balancing, this resulted in a pretty smooth ride:
 
 ![](v1.gif)
 
-But the 100ms delay was giving it trouble, as seen by when the car swerves and oscilates back and forth around the centre of the track.
+But the 100ms delay was giving it trouble, as seen by when the car swerves and oscilates back and forth around the centre of the track. So to handle the 100ms delay, I made the solver look back two timsteps if it can, to account for the latency, which is equal in time to one timestep.
 
-So to handle the 100ms delay, I 
+This made the car drive in a much less oscilating way, and kept the yellow line more accurate to the world waypoints when turning.
 
